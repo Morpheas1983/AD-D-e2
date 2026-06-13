@@ -5,7 +5,9 @@ const $ = id => document.getElementById(id);
 
 const State = {
     view: 'login',
+    previousView: null,
     currentUser: null,
+    currentUserName: null,
     isDM: false,
     currentCharacter: null,
     characters: [],
@@ -321,19 +323,19 @@ function verifyCredentials(username, password) {
 }
 
 function isDM() {
-    return State.currentUser && State.currentUser.role === 'dm';
+    return State.isDM === true;
 }
 
 function isPlayer() {
-    return State.currentUser && State.currentUser.role === 'player';
+    return State.currentUser && !State.isDM;
 }
 
 function canAccessDMFeatures() {
-    return isDM();
+    return State.isDM === true;
 }
 
 function getCurrentUserName() {
-    return State.currentUser ? State.currentUser.name : 'Guest';
+    return State.currentUserName || State.currentUser || 'Guest';
 }
 
 function createUser(username, password, role, name) {
@@ -367,19 +369,19 @@ function listUsers() {
 }
 
 function isDM() {
-    return State.currentUser && State.currentUser.role === 'dm';
+    return State.isDM === true;
 }
 
 function isPlayer() {
-    return State.currentUser && State.currentUser.role === 'player';
+    return State.currentUser && !State.isDM;
 }
 
 function canAccessDMFeatures() {
-    return isDM();
+    return State.isDM === true;
 }
 
 function getCurrentUserName() {
-    return State.currentUser ? State.currentUser.name : 'Guest';
+    return State.currentUserName || State.currentUser || 'Guest';
 }
 
 function linkifyStory(text) {
@@ -394,4 +396,188 @@ function linkifyStory(text) {
         });
     });
     return html;
+}
+
+function getMapList() {
+    try {
+        const raw = localStorage.getItem('adnd2e_maps');
+        return raw ? JSON.parse(raw) : [];
+    } catch(e) { return []; }
+}
+
+function saveMapList(maps) {
+    localStorage.setItem('adnd2e_maps', JSON.stringify(maps));
+}
+
+function getActiveMapId() {
+    return localStorage.getItem('adnd2e_activeMapId') || null;
+}
+
+function setActiveMapId(id) {
+    if (id) localStorage.setItem('adnd2e_activeMapId', id);
+    else localStorage.removeItem('adnd2e_activeMapId');
+}
+
+/* ============================
+   NAVIGATION & AUTH
+   ============================ */
+const VIEW_MAP = {
+    'login': 'login.html', 'dashboard': 'dashboard.html', 'create': 'create.html',
+    'sheet': 'sheet.html', 'inventory': 'inventory.html', 'levelup': 'levelup.html',
+    'dm_view': 'dm.html', 'bestiary': 'bestiary.html', 'monsters': 'monsters.html',
+    'spells': 'spells.html', 'campaign': 'campaign.html', 'tactical': 'tactical.html',
+    'campaigns': 'campaigns.html', 'campaign_detail': 'campaign-detail.html',
+    'users': 'users.html'
+};
+
+function changeView(view) {
+    const target = VIEW_MAP[view];
+    if (target) window.location.href = target;
+    else console.warn('Unknown view:', view);
+}
+
+function goBack() {
+    if (window.history.length > 1) history.back();
+    else changeView('login');
+}
+
+function requireAuth() {
+    if (!State.currentUser) {
+        window.location.href = 'login.html';
+        return false;
+    }
+    return true;
+}
+
+function requireDM() {
+    if (!requireAuth()) return false;
+    if (!State.isDM) {
+        window.location.href = 'dashboard.html';
+        return false;
+    }
+    return true;
+}
+
+function initApp() {
+    try {
+        const savedUsers = localStorage.getItem('adnd2e_users');
+        if (savedUsers) {
+            try { DB.users = JSON.parse(savedUsers); } catch(e) {}
+        }
+        Storage.load();
+        Sync.init();
+    } catch (err) {
+        console.error('App initialization error:', err);
+    }
+}
+
+function toast(msg, type='success') {
+    const div = document.createElement('div');
+    div.className = 'toast';
+    div.innerHTML = `<i class="fas fa-${type==='error'?'exclamation-circle':'check-circle'} mr-2"></i>${msg}`;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 3000);
+}
+
+function logout() {
+    firebaseListeners.forEach(ref => ref.off());
+    firebaseListeners = [];
+    State.currentUser = null;
+    State.currentUserName = null;
+    State.isDM = false;
+    State.currentCharacter = null;
+    localStorage.removeItem('adnd2e_currentUser');
+    localStorage.removeItem('adnd2e_currentUserName');
+    localStorage.removeItem('adnd2e_isDM');
+    localStorage.removeItem('adnd2e_currentCharacter');
+    changeView('login');
+}
+
+function loadCharacter(id) {
+    const char = State.characters.find(c => c.id === id);
+    if (!char) return;
+    if (!State.isDM && char.player !== State.currentUser) return toast('Access denied', 'error');
+    State.currentCharacter = char;
+    changeView('sheet');
+}
+
+function dmViewCharacter(id) {
+    loadCharacter(id);
+}
+
+function switchCampaign(campaignId) {
+    const trimmed = campaignId ? campaignId.trim() : null;
+    State.campaignId = trimmed || null;
+    Storage.save();
+    if (db && firebaseAuth && State.campaignId) {
+        setupFirebaseListeners();
+    }
+    changeView('dashboard');
+    if (State.campaignId) {
+        toast(`Switched to campaign: ${State.campaignId}`);
+    } else {
+        toast(`Showing all characters.`);
+    }
+}
+
+function createCampaign(name) {
+    if (!name || !name.trim()) return toast('Please enter a campaign name', 'error');
+    const trimmed = name.trim();
+    const exists = State.characters.some(c => c.campaignId === trimmed);
+    if (exists) {
+        switchCampaign(trimmed);
+        return;
+    }
+    State.campaignId = trimmed;
+    Storage.save();
+    if (db && firebaseAuth) {
+        setupFirebaseListeners();
+    }
+    changeView('dashboard');
+    toast(`Campaign '${trimmed}' created! Create your first character.`);
+}
+
+function exportCampaign() {
+    const data = {
+        characters: State.characters,
+        creatures: State.creatures,
+        customSpells: State.customSpells,
+        campaign: State.campaign,
+        exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `adnd_campaign_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Campaign exported!');
+}
+
+function importCampaign() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                if (data.characters) State.characters = data.characters;
+                if (data.creatures) State.creatures = data.creatures;
+                if (data.customSpells) State.customSpells = data.customSpells;
+                if (data.campaign) State.campaign = data.campaign;
+                Storage.save();
+                toast('Campaign imported successfully!');
+                changeView('dashboard');
+            } catch (err) {
+                toast('Invalid file format', 'error');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
 }

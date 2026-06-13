@@ -98,10 +98,25 @@ function setupFirebaseListeners() {
     mapRef.on('value', snap => {
         if (snap.exists()) {
             State.tacticalMap = snap.val();
-            if (State.view === 'tactical' || State.view === 'tactical_player') drawTacticalMap();
+            if (State.view === 'tactical') drawTacticalMap();
         }
     });
     firebaseListeners.push(mapRef);
+
+    const mapsRef = db.ref(`${base}/maps`);
+    mapsRef.on('value', snap => {
+        if (snap.exists()) saveMapList(snap.val() || []);
+    });
+    firebaseListeners.push(mapsRef);
+
+    const activeMapRef = db.ref(`${base}/activeMapId`);
+    activeMapRef.on('value', snap => {
+        if (snap.exists()) {
+            setActiveMapId(snap.val());
+            if (State.view === 'tactical') drawTacticalMap();
+        }
+    });
+    firebaseListeners.push(activeMapRef);
 }
 
 function updateConnectionStatus() {
@@ -184,6 +199,14 @@ const Sync = {
             State.tacticalMap = data.tacticalMap;
             changed = true;
         }
+        if (data.maps) {
+            saveMapList(data.maps);
+            changed = true;
+        }
+        if (data.activeMapId) {
+            setActiveMapId(data.activeMapId);
+            changed = true;
+        }
         if (changed) {
             if (State.currentCharacter) {
                 const updated = State.characters.find(c => c.id === State.currentCharacter.id);
@@ -208,6 +231,10 @@ const Storage = {
         localStorage.setItem('adnd2e_customSpells', JSON.stringify(State.customSpells));
         localStorage.setItem('adnd2e_campaign', JSON.stringify(State.campaign));
         localStorage.setItem('adnd2e_campaignId', State.campaignId || '');
+        localStorage.setItem('adnd2e_currentUser', State.currentUser || '');
+        localStorage.setItem('adnd2e_currentUserName', State.currentUserName || '');
+        localStorage.setItem('adnd2e_isDM', JSON.stringify(State.isDM || false));
+        localStorage.setItem('adnd2e_currentCharacter', State.currentCharacter ? State.currentCharacter.id : '');
         
         // Sync to Firebase if available
         if (firebaseConnected && db && State.campaignId) {
@@ -218,6 +245,8 @@ const Storage = {
             updates[`${base}/customSpells`] = State.customSpells;
             updates[`${base}/campaign`] = State.campaign;
             updates[`${base}/tacticalMap`] = State.tacticalMap || {};
+            updates[`${base}/maps`] = getMapList();
+            updates[`${base}/activeMapId`] = getActiveMapId() || '';
             updates[`${base}/lastUpdated`] = now;
             db.ref().update(updates).catch(err => console.error('Firebase save error:', err));
         }
@@ -227,7 +256,9 @@ const Storage = {
                 characters: State.characters,
                 creatures: State.creatures,
                 campaign: State.campaign,
-                tacticalMap: State.tacticalMap
+                tacticalMap: State.tacticalMap,
+                maps: getMapList(),
+                activeMapId: getActiveMapId()
             });
         }
     },
@@ -248,8 +279,18 @@ const Storage = {
 
             const cid = localStorage.getItem('adnd2e_campaignId');
             if (cid) State.campaignId = cid;
-            const tmap = localStorage.getItem('adnd2e_tacticalMap');
-            if (tmap) State.tacticalMap = JSON.parse(tmap);
+            const maps = localStorage.getItem('adnd2e_maps');
+            if (maps) saveMapList(JSON.parse(maps));
+            const amid = localStorage.getItem('adnd2e_activeMapId');
+            if (amid) setActiveMapId(amid);
+            const users = localStorage.getItem('adnd2e_users');
+            if (users) DB.users = JSON.parse(users);
+            const cu = localStorage.getItem('adnd2e_currentUser');
+            if (cu) { State.currentUser = cu; State.currentUserName = localStorage.getItem('adnd2e_currentUserName') || cu; }
+            const dm = localStorage.getItem('adnd2e_isDM');
+            if (dm) { try { State.isDM = JSON.parse(dm); } catch(e) {} }
+            const ccid = localStorage.getItem('adnd2e_currentCharacter');
+            if (ccid) { const cc = State.characters.find(c => c.id === ccid); if (cc) State.currentCharacter = cc; }
         } catch (e) {
             console.error('Storage.load error:', e);
             alert('Error loading saved data. Your local storage may be corrupted. Try clearing browser data for this site.');
@@ -261,6 +302,10 @@ const Storage = {
         localStorage.removeItem('adnd2e_customSpells');
         localStorage.removeItem('adnd2e_campaign');
         localStorage.removeItem('adnd2e_campaignId');
+        localStorage.removeItem('adnd2e_currentUser');
+        localStorage.removeItem('adnd2e_currentUserName');
+        localStorage.removeItem('adnd2e_isDM');
+        localStorage.removeItem('adnd2e_currentCharacter');
     }
 };
 
