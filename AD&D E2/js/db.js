@@ -651,6 +651,8 @@ const DB = {
     users: [
         { username: "dm", passwordHash: "4889ba9b0efab1cd", role: "dm", name: "Dungeon Master" },
         { username: "player1", passwordHash: "4889ba9b0efab1cd", role: "player", name: "Player One" },
-        { username: "player2", passwordHash: "4889ba9b0efab1cd", role: "player", name: "Player Two" }
+        { username: "player2", passwordHash: "4889ba9b0efab1cd", role: "player", name: "Player Two" },
+		{ username: "Vassilis", passwordHash: "4889ba9b0efab1cd", role: "player", name: "Vassilis" },
+		{ username: "vagelis", passwordHash: "4889ba9b0efab1cd", role: "player", name: "vagelis" }
     ]
 };

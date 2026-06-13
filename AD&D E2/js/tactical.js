@@ -12,7 +12,7 @@ function renderTacticalMap(container) {
                 <div class="parchment scroll-border p-4 mb-4 fade-in">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                         <div class="flex items-center gap-3">
-                            <button onclick="changeView('${isDM ? 'dm_view' : 'dashboard'}')" class="btn-galactic px-3 py-2 rounded text-sm">
+                            <button onclick="changeView('${isDM ? 'dm' : 'dashboard'}')" class="btn-galactic px-3 py-2 rounded text-sm">
                                 <i class="fas fa-arrow-left"></i> Back
                             </button>
                             <h1 class="fantasy-font text-2xl font-bold text-amber-900">
@@ -50,7 +50,6 @@ function renderTacticalMap(container) {
                     </div>
                 </div>
 
-                <!-- Map Manager -->
                 <div class="parchment scroll-border p-4 mb-4 fade-in">
                     <div class="flex flex-col md:flex-row gap-3 items-start md:items-center">
                         <div class="flex items-center gap-2">
@@ -67,7 +66,7 @@ function renderTacticalMap(container) {
                             <button onclick="saveMapWithName()" class="btn-fantasy px-3 py-2 rounded text-sm">
                                 <i class="fas fa-save mr-1"></i>Save
                             </button>
-                            <button onclick="deleteMapById(document.getElementById('mapSelector').value)" class="btn-danger px-3 py-2 rounded text-sm" ${!activeId ? 'disabled' : ''}>
+                            <button onclick="deleteMapById(document.getElementById('mapSelector').value)" class="btn-danger px-3 py-2 rounded text-sm ${!activeId ? 'disabled' : ''}">
                                 <i class="fas fa-trash mr-1"></i>Delete
                             </button>
                         </div>
@@ -76,7 +75,6 @@ function renderTacticalMap(container) {
                 </div>
 
                 <div class="flex flex-col lg:flex-row gap-4">
-                    <!-- Canvas -->
                     <div class="flex-1">
                         <div class="parchment scroll-border p-2 fade-in">
                             <canvas id="tacticalCanvas" width="1000" height="750" 
@@ -89,8 +87,8 @@ function renderTacticalMap(container) {
                         </div>
                         <div class="parchment scroll-border p-3 mt-2 fade-in">
                             <div class="text-sm text-amber-800">
-                                <span class="font-bold">Grid:</span> ${mapData.gridSize}px • 
-                                <span class="font-bold">Size:</span> ${mapData.width}×${mapData.height} squares • 
+                                <span class="font-bold">Grid:</span> ${mapData.gridSize}px &middot; 
+                                <span class="font-bold">Size:</span> ${mapData.width}&times;${mapData.height} squares &middot; 
                                 <span class="font-bold">Scale:</span> 1 square = 5 feet
                             </div>
                             <div class="text-xs text-amber-700 mt-1">
@@ -102,9 +100,7 @@ function renderTacticalMap(container) {
                         </div>
                     </div>
 
-                    <!-- Sidebar -->
                     <div class="w-full lg:w-80 space-y-3">
-                        <!-- Token Palette -->
                         <div class="parchment scroll-border p-3 fade-in">
                             <div class="section-header"><i class="fas fa-chess"></i>Token Palette</div>
                             <div class="space-y-2">
@@ -149,7 +145,6 @@ function renderTacticalMap(container) {
                             </div>
                         </div>
 
-                        <!-- Selected Token Info -->
                         <div class="parchment scroll-border p-3 fade-in">
                             <div class="section-header"><i class="fas fa-info-circle"></i>Selected Token</div>
                             <div id="tokenInfo" class="text-sm text-amber-800">
@@ -157,7 +152,6 @@ function renderTacticalMap(container) {
                             </div>
                         </div>
 
-                        <!-- Distance Calculator -->
                         <div class="parchment scroll-border p-3 fade-in">
                             <div class="section-header"><i class="fas fa-ruler"></i>Distance</div>
                             <div id="distanceInfo" class="text-sm text-amber-800">
@@ -165,7 +159,6 @@ function renderTacticalMap(container) {
                             </div>
                         </div>
 
-                        <!-- Movement -->
                         <div class="parchment scroll-border p-3 fade-in">
                             <div class="section-header"><i class="fas fa-running"></i>Movement</div>
                             <div class="text-xs text-amber-700 space-y-1">
@@ -180,7 +173,6 @@ function renderTacticalMap(container) {
         </div>
     `;
 
-    // Draw the map after a short delay to ensure canvas is in DOM
     setTimeout(() => drawTacticalMap(), 100);
 }
 
@@ -256,9 +248,16 @@ function handleMapMouseDown(evt) {
     // Dragging tokens: right-click, shift+click, or move tool left-click
     if (evt.button === 2 || evt.shiftKey || (tool === 'move' && evt.button === 0)) {
         if (token) {
-            if (!isDM && token.type !== 'player') {
-                toast('You can only move your own character!', 'error');
-                return;
+            if (!isDM) {
+                const currentUser = State.currentUser;
+                const charName = token.name;
+                const isPlayerToken = token.type === 'player';
+                const userChars = (State.characters || []).filter(c => c.player === currentUser);
+                const isAssignedChar = userChars.some(c => c.name === charName);
+                if (!isPlayerToken && !isAssignedChar) {
+                    toast('You can only move your own character!', 'error');
+                    return;
+                }
             }
             State.mapDragging = true;
             State.draggedToken = token;
@@ -274,13 +273,13 @@ function handleMapMouseDown(evt) {
                 const dist = calculateGridDistance(State.mapSelectedToken, token);
                 const distEl = document.getElementById('distanceInfo');
                 if (distEl) {
-                    distEl.innerHTML = `<div class="text-amber-900"><div class="font-bold">${State.mapSelectedToken.name} → ${token.name}</div><div class="text-lg font-bold">${dist.squares} squares</div><div class="text-xs">${dist.feet} feet</div></div>`;
+                    distEl.innerHTML = `<div class="text-amber-900"><div class="font-bold">${State.mapSelectedToken.name} &rarr; ${token.name}</div><div class="text-lg font-bold">${dist.squares} squares</div><div class="text-xs">${dist.feet} feet</div></div>`;
                 }
             }
             State.mapSelectedToken = token;
             const infoEl = document.getElementById('tokenInfo');
             if (infoEl) {
-                infoEl.innerHTML = `<div class="text-amber-900"><div class="font-bold">${token.name}</div><div class="text-xs">Type: ${token.type} • Position: (${token.x}, ${token.y})</div><div class="text-xs mt-1">${isDM ? 'Select Move tool or right-click drag to move tokens.' : 'Right-click and drag to move your character.'}</div></div>`;
+                infoEl.innerHTML = `<div class="text-amber-900"><div class="font-bold">${token.name}</div><div class="text-xs">Type: ${token.type} &middot; Position: (${token.x}, ${token.y})</div><div class="text-xs mt-1">${isDM ? 'Select Move tool or right-click drag to move tokens.' : 'Right-click and drag your character to move.'}</div></div>`;
             }
         } else {
             State.mapSelectedToken = null;
@@ -332,7 +331,6 @@ function calculateGridDistance(tokenA, tokenB) {
     const dy = Math.abs(tokenA.y - tokenB.y);
     const minDist = Math.min(dx, dy);
     const maxDist = Math.max(dx, dy);
-    // AD&D 2e: diagonal = 1.5 squares
     const squares = maxDist + Math.floor(minDist / 2);
     const feet = squares * 5;
     return { squares, feet, diagonal: minDist };
@@ -345,11 +343,9 @@ function drawTacticalMap() {
     const map = State.tacticalMap || { gridSize: 50, tokens: [], terrain: [], width: 20, height: 15 };
     const gs = map.gridSize;
 
-    // Clear
     ctx.fillStyle = '#f5e6c8';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw grid
     ctx.strokeStyle = '#d4a574';
     ctx.lineWidth = 1;
     for (let x = 0; x <= map.width; x++) {
@@ -365,11 +361,9 @@ function drawTacticalMap() {
         ctx.stroke();
     }
 
-    // Draw terrain
     map.terrain.forEach(t => {
         ctx.fillStyle = t.color || '#5c4033';
         ctx.fillRect(t.x * gs + 1, t.y * gs + 1, gs - 2, gs - 2);
-        // Draw terrain icon
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
         ctx.font = `${gs * 0.4}px FontAwesome`;
         ctx.textAlign = 'center';
@@ -378,13 +372,11 @@ function drawTacticalMap() {
         ctx.fillText(icons[t.type] || '', t.x * gs + gs/2, t.y * gs + gs/2);
     });
 
-    // Draw tokens
     map.tokens.forEach(t => {
         const cx = t.x * gs + gs / 2;
         const cy = t.y * gs + gs / 2;
         const radius = gs * 0.4;
 
-        // Token circle
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.fillStyle = t.color || '#6b7280';
@@ -393,7 +385,6 @@ function drawTacticalMap() {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Selection highlight
         if (State.mapSelectedToken && State.mapSelectedToken.id === t.id) {
             ctx.beginPath();
             ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
@@ -402,7 +393,6 @@ function drawTacticalMap() {
             ctx.stroke();
         }
 
-        // Label
         ctx.fillStyle = '#fff';
         ctx.font = `bold ${gs * 0.22}px sans-serif`;
         ctx.textAlign = 'center';
@@ -410,7 +400,6 @@ function drawTacticalMap() {
         ctx.fillText(t.name.substring(0, 3), cx, cy);
     });
 
-    // Draw distance line if two tokens selected
     if (State.mapSelectedToken) {
         const t = State.mapSelectedToken;
         ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
@@ -439,7 +428,7 @@ function saveMapWithName() {
     saveMapList(maps);
     setActiveMapId(entry.id);
     Storage.save();
-    toast(`Map "${name}" saved!`);
+    toast(`Map "${name}" saved`);
     render();
 }
 
@@ -483,7 +472,6 @@ function setActiveMap(id) {
 
 function render() { renderTacticalMap(document.getElementById('app')); }
 
-/* Init */
 initApp();
 if (!State.currentUser) {
     changeView('login');

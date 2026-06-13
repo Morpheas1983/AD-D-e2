@@ -79,3 +79,41 @@
 .token-npc { background: #f59e0b; }
 .token-object { background: #9ca3af; }
 
+/* Story Link Styles */
+.story-link {
+    cursor: pointer;
+    text-decoration: underline;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.story-link:hover {
+    text-decoration: none;
+    opacity: 0.8;
+}
+.monster-link {
+    color: #92400e;
+    background: rgba(251, 191, 36, 0.2);
+    padding: 0 4px;
+    border-radius: 3px;
+}
+.monster-link:hover {
+    background: rgba(251, 191, 36, 0.4);
+}
+.npc-link {
+    color: #1e40af;
+    background: rgba(59, 130, 246, 0.15);
+    padding: 0 4px;
+    border-radius: 3px;
+}
+.npc-link:hover {
+    background: rgba(59, 130, 246, 0.3);
+}
+.location-link {
+    color: #065f46;
+    background: rgba(16, 185, 129, 0.15);
+    padding: 0 4px;
+    border-radius: 3px;
+}
+.location-link:hover {
+    background: rgba(16, 185, 129, 0.3);
+}
